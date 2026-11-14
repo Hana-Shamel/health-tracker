@@ -31,6 +31,7 @@ const state = {
   pillForm: null,
   boxForm: false,
   editingVisitId: null,
+  trayPage: 0,
 };
 
 let showToken = 0;
@@ -64,6 +65,10 @@ function el(tag, attrs = {}, children = []) {
 
 function plusIcon() {
   return el("img", { class: "plus-icon", src: "/static/svg/buttons/plus.svg", alt: "" });
+}
+
+function arrowIcon(src) {
+  return el("img", { class: "tray-arrow-icon", src, alt: "" });
 }
 
 function showError(message) {
@@ -678,7 +683,45 @@ function pillTray() {
     tray.append(el("p", { class: "empty", text: "No pills yet." }));
     return tray;
   }
-  state.pills.forEach((pill) => tray.append(trayCard(pill)));
+  const previous = el("button", {
+    type: "button",
+    class: "tray-arrow",
+    "aria-label": "Previous pills",
+  }, [arrowIcon("/static/svg/buttons/left-arrow.svg")]);
+  const next = el("button", {
+    type: "button",
+    class: "tray-arrow",
+    "aria-label": "Next pills",
+  }, [arrowIcon("/static/svg/buttons/right-arrow.svg")]);
+  const windowEl = el("div", { class: "tray-window" });
+  const track = el("div", { class: "tray-track" });
+  state.pills.forEach((pill) => track.append(trayCard(pill)));
+  windowEl.append(track);
+
+  const update = (animate) => {
+    const card = track.querySelector(".tray-pill");
+    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    const cardWidth = card ? card.getBoundingClientRect().width + gap : 1;
+    const perPage = Math.max(1, Math.floor((windowEl.clientWidth + gap) / cardWidth));
+    const maxOffset = Math.max(0, track.scrollWidth - windowEl.clientWidth);
+    const offset = Math.min((state.trayPage || 0) * perPage * cardWidth, maxOffset);
+    track.style.transition = animate ? "" : "none";
+    track.style.transform = `translateX(${-offset}px)`;
+    previous.disabled = offset <= 0;
+    next.disabled = offset >= maxOffset - 1;
+  };
+
+  previous.addEventListener("click", () => {
+    state.trayPage = Math.max(0, (state.trayPage || 0) - 1);
+    update(true);
+  });
+  next.addEventListener("click", () => {
+    state.trayPage = (state.trayPage || 0) + 1;
+    update(true);
+  });
+  window.addEventListener("resize", () => update(false));
+  requestAnimationFrame(() => update(false));
+  tray.append(previous, windowEl, next);
   return tray;
 }
 

@@ -392,9 +392,11 @@ textarea {
 
 .tray {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  max-width: 1120px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 88px;
   padding: 12px;
   background: var(--paper);
@@ -402,10 +404,47 @@ textarea {
   border-radius: 16px;
 }
 
+.tray-window {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tray-track {
+  display: flex;
+  gap: 12px;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .tray-pill {
+  flex: 0 0 132px;
   width: 132px;
   padding: 8px;
   border-radius: 12px;
+}
+
+.tray-arrow {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.tray-arrow-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.tray-arrow:disabled,
+.tray-arrow:disabled .tray-arrow-icon {
+  color: var(--muted);
+  opacity: 0.4;
+  cursor: default;
+  border: 0;
+  background: transparent;
 }
 
 .tray-pill.selected {
