@@ -8,13 +8,14 @@ const TAGS = [
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const COLORS = ["#f7f4ee", "#f2d36b", "#f3a6c8", "#8eb6e8", "#7dbe8a", "#f0a05a", "#e07a7a", "#b59ad6"];
-const SHAPES = ["big-round", "small-round", "oval", "capsule", "injection"];
+const SHAPES = ["big-round", "small-round", "oval", "capsule", "injection", "cream"];
 const SHAPE_FILES = {
   "big-round": "/static/svg/pills/big-round.svg",
   "small-round": "/static/svg/pills/small-round.svg",
   oval: "/static/svg/pills/oval.svg",
   capsule: "/static/svg/pills/capsule.svg",
   injection: "/static/svg/pills/syringe.svg",
+  cream: "/static/svg/pills/cream.svg",
 };
 const shapeMarkup = {};
 
@@ -36,6 +37,7 @@ const state = {
 
 let showToken = 0;
 let ignoreClickUntil = 0;
+let shownView = null;
 const blankDragImage = new Image();
 blankDragImage.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
@@ -69,6 +71,12 @@ function plusIcon() {
 
 function arrowIcon(src) {
   return el("img", { class: "tray-arrow-icon", src, alt: "" });
+}
+
+function pageClass(view) {
+  const enter = shownView !== view;
+  shownView = view;
+  return enter ? "page page-enter" : "page";
 }
 
 function showError(message) {
@@ -201,6 +209,10 @@ function pillNode(pill) {
     const paths = svg.querySelectorAll("path");
     paths[0].setAttribute("fill", color);
     paths[1].setAttribute("fill", right);
+  } else if (shape === "cream") {
+    const paths = svg.querySelectorAll("path");
+    paths[1].setAttribute("fill", right);
+    paths[2].setAttribute("fill", color);
   } else if (shape === "injection") {
     svg.querySelector("[id='secondary']").setAttribute("fill", color);
   } else {
@@ -421,12 +433,13 @@ function paintLog() {
     }
   });
 
-  const layout = el("div", { class: "log-layout" }, [
+  const layout = el("div", { class: shownView === "log" ? "log-layout" : "log-layout page-enter" }, [
     el("h1", { class: "sr-only", text: "Log" }),
     scroller,
     el("p", { class: "notice", id: "notice", role: "alert", text: state.error }),
     form,
   ]);
+  shownView = "log";
   app.replaceChildren(layout);
 }
 
@@ -571,7 +584,7 @@ async function loadMedicine(token) {
 function paintMedicine() {
   const app = document.getElementById("app");
   const previousScroll = document.querySelector("#app .page")?.scrollTop ?? 0;
-  const page = el("div", { class: "page" });
+  const page = el("div", { class: pageClass("medicine") });
   const head = el("div", { class: "page-head" }, [
     el("h1", { text: "Medicine" }),
     el("button", { type: "button", class: "medicine-add", "aria-label": "New pill" }, [
@@ -602,6 +615,7 @@ function paintMedicine() {
   page.append(addBoxControl());
   app.replaceChildren(page);
   page.scrollTop = previousScroll;
+  state.animateDay = false;
 }
 
 function pillFormElement() {
@@ -648,8 +662,10 @@ function pillFormElement() {
     el("label", { class: "stack-label", text: "Name" }, [name]),
     el("label", { class: "stack-label", text: "What it does" }, [description]),
     el("div", { class: "stack-label", text: "Shape" }, [shapeRow]),
-    colorChoices(formState, formState.shape === "capsule" ? "Left side" : "Color", "color"),
-    formState.shape === "capsule" ? colorChoices(formState, "Right side", "color_right") : "",
+    colorChoices(formState, formState.shape === "capsule" ? "Left side" : formState.shape === "cream" ? "Main body" : "Color", "color"),
+    formState.shape === "capsule" || formState.shape === "cream"
+      ? colorChoices(formState, formState.shape === "cream" ? "Small piece" : "Right side", "color_right")
+      : "",
     el("div", { class: "form-actions" }, [
       el("button", { type: "submit", class: "primary", text: "Save pill" }),
       el("button", { type: "button", class: "text-button", text: "Cancel" }),
@@ -666,7 +682,7 @@ function pillFormElement() {
       description: description.value,
       shape: formState.shape,
       color: formState.color,
-      color_right: formState.shape === "capsule" ? formState.color_right : null,
+      color_right: formState.shape === "capsule" || formState.shape === "cream" ? formState.color_right : null,
     };
     try {
       if (formState.id) {
@@ -1035,6 +1051,7 @@ function dayButton(box, weekday, isOpen) {
   button.addEventListener("click", () => {
     if (isOpen) return;
     state.openDay[box.id] = weekday;
+    state.animateDay = box.id;
     paintMedicine();
   });
   return button;
@@ -1045,7 +1062,7 @@ function openDay(box, weekday) {
   for (let slot = 0; slot < 12; slot += 1) {
     grid.append(slotElement(box, weekday, slot));
   }
-  return el("div", { class: "day-panel" }, [
+  return el("div", { class: state.animateDay === box.id ? "day-panel is-opening" : "day-panel" }, [
     el("div", { class: "lid", text: DAYS[weekday] }),
     el("div", { class: "compartment" }, [grid]),
   ]);
@@ -1229,7 +1246,7 @@ async function renderVisitsPage(token) {
 
 function paintVisits() {
   const app = document.getElementById("app");
-  const page = el("div", { class: "page" });
+  const page = el("div", { class: pageClass("visits") });
   page.append(el("div", { class: "page-head" }, [el("h1", { text: "Doctor visits" })]));
   page.append(el("p", { class: "notice", id: "notice", role: "alert", text: state.error }));
   page.append(visitForm());

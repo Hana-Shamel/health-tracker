@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 ALLOWED_TAGS = ("food", "medication", "measurement", "physical activity", "symptom")
-ALLOWED_SHAPES = ("big-round", "small-round", "oval", "capsule", "injection")
+ALLOWED_SHAPES = ("big-round", "small-round", "oval", "capsule", "injection", "cream")
 COLOR_RE = re.compile(r"^#[0-9a-f]{6}$")
 
 
