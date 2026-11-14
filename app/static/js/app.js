@@ -706,16 +706,24 @@ function pillTray() {
   windowEl.append(track);
 
   const update = (animate) => {
-    const card = track.querySelector(".tray-pill");
-    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
-    const cardWidth = card ? card.getBoundingClientRect().width + gap : 1;
-    const perPage = Math.max(1, Math.floor((windowEl.clientWidth + gap) / cardWidth));
-    const maxOffset = Math.max(0, track.scrollWidth - windowEl.clientWidth);
-    const offset = Math.min((state.trayPage || 0) * perPage * cardWidth, maxOffset);
+    const cardGap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    windowEl.style.width = "";
+    const available = windowEl.clientWidth;
+    const minPill = 140;
+    const perPage = Math.max(1, Math.floor((available + cardGap) / (minPill + cardGap)));
+    const pillWidth = (available - cardGap * (perPage - 1)) / perPage;
+    track.querySelectorAll(".tray-pill").forEach((pill) => {
+      pill.style.flex = `0 0 ${pillWidth}px`;
+      pill.style.width = `${pillWidth}px`;
+    });
+    const stride = pillWidth + cardGap;
+    const pageCount = Math.max(1, Math.ceil(state.pills.length / perPage));
+    state.trayPage = Math.min(state.trayPage || 0, pageCount - 1);
+    const start = state.trayPage * perPage;
     track.style.transition = animate ? "" : "none";
-    track.style.transform = `translateX(${-offset}px)`;
-    previous.disabled = offset <= 0;
-    next.disabled = offset >= maxOffset - 1;
+    track.style.transform = `translateX(${-start * stride}px)`;
+    previous.disabled = state.trayPage === 0;
+    next.disabled = start + perPage >= state.pills.length;
   };
 
   previous.addEventListener("click", () => {
@@ -737,7 +745,6 @@ function trayCard(pill) {
   const card = el("div", { class: selected ? "tray-pill selected" : "tray-pill" });
   const pick = el("div", {
     class: "pick",
-    draggable: "true",
     role: "button",
     tabindex: "0",
     "aria-pressed": selected ? "true" : "false",
@@ -758,29 +765,68 @@ function trayCard(pill) {
       pick.click();
     }
   });
-  pick.addEventListener("dragstart", (event) => {
-    ignoreClickUntil = Date.now() + 400;
-    event.dataTransfer.setData("text/plain", JSON.stringify({ kind: "library", pillId: pill.id }));
-    event.dataTransfer.effectAllowed = "copyMove";
-    event.dataTransfer.setDragImage(blankDragImage, 0, 0);
-  
-    const ghost = el("div", { class: "drag-ghost" }, [
-      pillNode(pill),
-      el("span", { class: "pill-name", text: pill.name }),
-    ]);
-    document.body.append(ghost);
-    const place = (dragEvent) => {
-      if (!dragEvent.clientX && !dragEvent.clientY) return;
-      ghost.style.left = `${dragEvent.clientX}px`;
-      ghost.style.top = `${dragEvent.clientY}px`;
+  pick.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+    let ghost = null;
+    let overSlot = null;
+
+    const place = (moveEvent) => {
+      ghost.style.left = `${moveEvent.clientX}px`;
+      ghost.style.top = `${moveEvent.clientY}px`;
+      const slot = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest(".slot");
+      if (slot !== overSlot) {
+        if (overSlot) overSlot.classList.remove("over");
+        overSlot = slot || null;
+        if (overSlot) overSlot.classList.add("over");
+      }
     };
-    place(event);
-    const onDrag = (dragEvent) => place(dragEvent);
-    pick.addEventListener("drag", onDrag);
-    pick.addEventListener("dragend", () => {
-      pick.removeEventListener("drag", onDrag);
-      ghost.remove();
-    }, { once: true });
+
+    const start = (moveEvent) => {
+      dragging = true;
+      ignoreClickUntil = Date.now() + 400;
+      pick.setPointerCapture(moveEvent.pointerId);
+      document.body.classList.add("is-dragging");
+      ghost = el("div", { class: "drag-ghost" }, [
+        pillNode(pill),
+        el("span", { class: "pill-name", text: pill.name }),
+      ]);
+      document.body.append(ghost);
+      place(moveEvent);
+    };
+
+    const onMove = (moveEvent) => {
+      if (!dragging) {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (Math.hypot(dx, dy) < 4) return;
+        start(moveEvent);
+        return;
+      }
+      place(moveEvent);
+    };
+
+    const finish = () => {
+      pick.removeEventListener("pointermove", onMove);
+      pick.removeEventListener("pointerup", finish);
+      pick.removeEventListener("pointercancel", finish);
+      if (!dragging) return;
+      document.body.classList.remove("is-dragging");
+      if (ghost) ghost.remove();
+      if (overSlot) {
+        overSlot.classList.remove("over");
+        const boxId = Number(overSlot.dataset.box);
+        const weekday = Number(overSlot.dataset.weekday);
+        const slotIndex = Number(overSlot.dataset.slot);
+        assignSlot(boxId, weekday, slotIndex, pill.id);
+      }
+    };
+
+    pick.addEventListener("pointermove", onMove);
+    pick.addEventListener("pointerup", finish);
+    pick.addEventListener("pointercancel", finish);
   });
   const actions = el("div", { class: "tray-actions" });
   const showActions = () => {
@@ -1011,6 +1057,9 @@ function slotElement(box, weekday, slot) {
   const node = el("div", {
     class: pill ? "slot filled" : "slot",
     tabindex: "0",
+    "data-box": String(box.id),
+    "data-weekday": String(weekday),
+    "data-slot": String(slot),
     "aria-label": pill ? `${pill.name}, slot ${slot + 1}` : `Empty slot ${slot + 1}`,
   });
   if (pill) {
@@ -1018,6 +1067,7 @@ function slotElement(box, weekday, slot) {
     shape.setAttribute("draggable", "true");
     shape.title = pill.description ? `${pill.name}. ${pill.description}` : pill.name;
     shape.addEventListener("dragstart", (event) => {
+      document.body.classList.add("is-dragging");
       event.dataTransfer.setData("text/plain", JSON.stringify({
         kind: "slot",
         pillId: pill.id,
@@ -1353,6 +1403,7 @@ function init() {
   });
   window.addEventListener("hashchange", () => show(viewFromHash()));
   document.addEventListener("dragend", () => {
+    document.body.classList.remove("is-dragging");
     document.querySelectorAll(".slot.over").forEach((node) => node.classList.remove("over"));
   });
   document.addEventListener("keydown", (event) => {
