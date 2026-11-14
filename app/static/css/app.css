@@ -19,6 +19,41 @@
   box-sizing: border-box;
 }
 
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #a89b8c transparent;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #a89b8c;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -287,18 +322,40 @@ textarea {
 }
 
 .shape-choice[aria-pressed="true"],
-.color-choice[aria-pressed="true"],
 .tag-toggle[aria-pressed="true"] {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-input[type="color"] {
-  width: 42px;
-  height: 42px;
-  padding: 2px;
-  border: 1px solid var(--line);
+.color-choice[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.color-picker {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.color-picker img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
   border-radius: 50%;
-  background: transparent;
+  pointer-events: none;
+}
+
+.color-picker input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .pill-svg {
@@ -433,49 +490,74 @@ input.box-title {
 
 .week {
   display: flex;
-  gap: 8px;
-  align-items: stretch;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1120px;
   padding-bottom: 8px;
 }
 
-.day.closed {
-  flex: 0 0 86px;
+.day-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.day {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  min-height: 240px;
+  gap: 10px;
+  min-width: 0;
+  min-height: 88px;
   padding: 12px 6px;
   border: 0;
-  border-radius: 12px 12px 14px 14px;
-  background: linear-gradient(var(--lid), var(--lid-deep));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 2px rgba(40, 50, 60, 0.12);
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
-.day.open {
-  flex: 0 0 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 240px;
+.day:hover {
+  transform: translateY(-2px);
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 1px #cfc6b8,
+    0 8px 18px rgba(36, 48, 42, 0.06);
+}
+
+.day.open,
+.day.open:hover {
+  transform: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.day-panel {
+  border-radius: 18px;
   padding: 8px;
-  border-radius: 14px;
   background: var(--well);
   box-shadow:
     inset 0 0 0 1px #d5dbe3,
-    0 8px 20px rgba(40, 50, 60, 0.06);
+    0 16px 36px rgba(40, 50, 60, 0.07);
+  transform-origin: top center;
+  animation: panel-open 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lid {
-  border-radius: 10px 10px 4px 4px;
+  border-radius: 12px 12px 6px 6px;
   background: linear-gradient(#f7f9fb, var(--lid));
-  padding: 8px;
+  padding: 10px;
   text-align: center;
-  transform: perspective(180px) rotateX(36deg);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 13px;
+  transform: perspective(280px) rotateX(28deg);
   transform-origin: center bottom;
+  animation: lid-open 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .day-label {
@@ -500,17 +582,19 @@ input.box-title {
 }
 
 .compartment {
-  flex: 1;
-  border-radius: 12px;
-  padding: 12px 8px 10px;
+  border-radius: 14px;
+  padding: 16px 12px 12px;
   background: linear-gradient(#e9eef2, #f8fafb 28%);
   box-shadow: inset 0 2px 6px rgba(40, 50, 60, 0.08);
+  animation: compartment-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.06s backwards;
 }
 
 .slot-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px 12px;
+  max-width: 920px;
+  margin: 0 auto;
 }
 
 .slot {
@@ -522,7 +606,21 @@ input.box-title {
   min-height: 96px;
   padding: 0;
   border-radius: 12px;
+  animation: slot-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
+
+.slot:nth-child(1) { animation-delay: 0.08s; }
+.slot:nth-child(2) { animation-delay: 0.11s; }
+.slot:nth-child(3) { animation-delay: 0.14s; }
+.slot:nth-child(4) { animation-delay: 0.17s; }
+.slot:nth-child(5) { animation-delay: 0.2s; }
+.slot:nth-child(6) { animation-delay: 0.23s; }
+.slot:nth-child(7) { animation-delay: 0.26s; }
+.slot:nth-child(8) { animation-delay: 0.29s; }
+.slot:nth-child(9) { animation-delay: 0.32s; }
+.slot:nth-child(10) { animation-delay: 0.35s; }
+.slot:nth-child(11) { animation-delay: 0.38s; }
+.slot:nth-child(12) { animation-delay: 0.41s; }
 
 .slot::before {
   content: "";
@@ -777,6 +875,67 @@ input.box-title {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+@keyframes panel-open {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lid-open {
+  from {
+    opacity: 0.35;
+    transform: perspective(280px) rotateX(78deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(280px) rotateX(28deg);
+  }
+}
+
+@keyframes compartment-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slot-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .slot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day,
+  .day-panel,
+  .lid,
+  .compartment,
+  .slot {
+    animation: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 720px) {

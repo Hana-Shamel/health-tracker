@@ -227,7 +227,11 @@ function colorChoices(formState, label, field) {
   });
   custom.addEventListener("input", () => { formState[field] = custom.value; });
   custom.addEventListener("change", () => paintMedicine());
-  row.append(custom);
+  const picker = el("label", { class: "color-choice color-picker" }, [
+    el("img", { src: "/static/svg/buttons/color-picker.png", alt: "" }),
+    custom,
+  ]);
+  row.append(picker);
   return el("div", { class: "stack-label", text: label }, [row]);
 }
 
@@ -586,14 +590,6 @@ function paintMedicine() {
   page.append(addBoxControl());
   app.replaceChildren(page);
   page.scrollTop = previousScroll;
-  page.querySelectorAll(".week").forEach((week) => {
-    const open = week.querySelector(".day.open");
-    if (!open) return;
-    const weekRect = week.getBoundingClientRect();
-    const openRect = open.getBoundingClientRect();
-    const delta = openRect.left - weekRect.left - Math.max(0, (week.clientWidth - openRect.width) / 2);
-    week.scrollLeft += delta;
-  });
 }
 
 function pillFormElement() {
@@ -910,10 +906,11 @@ async function copyDay(box) {
 
 function weekElement(box, open) {
   const week = el("div", { class: "week", role: "group", "aria-label": `${box.title} week` });
+  const days = el("div", { class: "day-row" });
   for (let weekday = 0; weekday < 7; weekday += 1) {
-    if (weekday === open) week.append(openDay(box, weekday));
-    else week.append(closedDay(box, weekday));
+    days.append(dayButton(box, weekday, weekday === open));
   }
+  week.append(days, openDay(box, open));
   return week;
 }
 
@@ -925,12 +922,12 @@ function placementsFor(box, weekday) {
     .filter(Boolean);
 }
 
-function closedDay(box, weekday) {
+function dayButton(box, weekday, isOpen) {
   const button = el("button", {
     type: "button",
-    class: "day closed",
+    class: isOpen ? "day open" : "day",
     "aria-label": `Open ${DAYS[weekday]}`,
-    "aria-pressed": "false",
+    "aria-pressed": isOpen ? "true" : "false",
   }, [
     el("span", { class: "day-label", text: DAY_SHORT[weekday] }),
     el("span", { class: "pips" }, placementsFor(box, weekday).map((pill) => {
@@ -940,6 +937,7 @@ function closedDay(box, weekday) {
     })),
   ]);
   button.addEventListener("click", () => {
+    if (isOpen) return;
     state.openDay[box.id] = weekday;
     paintMedicine();
   });
@@ -951,7 +949,7 @@ function openDay(box, weekday) {
   for (let slot = 0; slot < 12; slot += 1) {
     grid.append(slotElement(box, weekday, slot));
   }
-  return el("div", { class: "day open" }, [
+  return el("div", { class: "day-panel" }, [
     el("div", { class: "lid", text: DAYS[weekday] }),
     el("div", { class: "compartment" }, [grid]),
   ]);
