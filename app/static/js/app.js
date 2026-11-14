@@ -353,7 +353,11 @@ function paintLog() {
     id: "log-scroll",
   });
   if (!state.logs.length) {
-    scroller.append(el("p", { class: "empty", text: "Nothing written yet." }));
+    scroller.append(el("section", { class: "empty-state", "aria-labelledby": "empty-title" }, [
+      el("span", { class: "empty-state-mark", "aria-hidden": "true" }),
+      el("h2", { id: "empty-title", text: "A clearer picture of your health, one note at a time." }),
+      el("p", { class: "empty", text: "Nothing written yet. Add a meal, symptom, measurement, or moment from your day below." }),
+    ]));
   } else {
     state.logs.forEach((entry) => scroller.append(renderEntry(entry)));
   }
