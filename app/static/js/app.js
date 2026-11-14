@@ -7,8 +7,16 @@ const TAGS = [
 ];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const SHAPES = ["round", "oval", "capsule"];
 const COLORS = ["#f7f4ee", "#f2d36b", "#f3a6c8", "#8eb6e8", "#7dbe8a", "#f0a05a", "#e07a7a", "#b59ad6"];
+const SHAPES = ["big-round", "small-round", "oval", "capsule", "injection"];
+const SHAPE_FILES = {
+  "big-round": "/static/svg/pills/big-round.svg",
+  "small-round": "/static/svg/pills/small-round.svg",
+  oval: "/static/svg/pills/oval.svg",
+  capsule: "/static/svg/pills/capsule.svg",
+  injection: "/static/svg/pills/syringe.svg",
+};
+const shapeMarkup = {};
 
 const state = {
   view: null,
@@ -27,6 +35,18 @@ const state = {
 
 let showToken = 0;
 let ignoreClickUntil = 0;
+const blankDragImage = new Image();
+blankDragImage.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+function ensureShapes() {
+  if (ensureShapes.promise) return ensureShapes.promise;
+  ensureShapes.promise = Promise.all(
+    Object.entries(SHAPE_FILES).map(async ([shape, url]) => {
+      shapeMarkup[shape] = await fetch(url).then((response) => response.text());
+    }),
+  );
+  return ensureShapes.promise;
+}
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -40,6 +60,10 @@ function el(tag, attrs = {}, children = []) {
     if (child != null && child !== false) node.append(child);
   });
   return node;
+}
+
+function plusIcon() {
+  return el("img", { class: "plus-icon", src: "/static/svg/buttons/plus.svg", alt: "" });
 }
 
 function showError(message) {
@@ -142,10 +166,69 @@ function safeColor(color) {
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#cccccc";
 }
 
-function pillNode(pill, className = "pill") {
-  const node = el("span", { class: `${className} ${pill.shape}` });
-  node.style.backgroundColor = safeColor(pill.color);
+const SVG_NS = "http://www.w3.org/2000/svg";
+let pillSvgSerial = 0;
+function svgEl(tag, attrs = {}, children = []) {
+  const node = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs).forEach(([key, value]) => {
+    if (value != null) node.setAttribute(key, String(value));
+  });
+  children.flat().forEach((child) => {
+    if (child) node.append(child);
+  });
   return node;
+}
+
+
+
+function pillNode(pill) {
+  const shape = pill.shape || "big-round";
+  const color = safeColor(pill.color);
+  const right = safeColor(pill.color_right || color);
+  const doc = new DOMParser().parseFromString(shapeMarkup[shape], "image/svg+xml");
+  const svg = document.importNode(doc.documentElement, true);
+  svg.classList.add("pill-svg", shape);
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  svg.setAttribute("aria-hidden", "true");
+
+  if (shape === "capsule") {
+    const paths = svg.querySelectorAll("path");
+    paths[0].setAttribute("fill", color);
+    paths[1].setAttribute("fill", right);
+  } else if (shape === "injection") {
+    svg.querySelector("[id='secondary']").setAttribute("fill", color);
+  } else {
+    svg.querySelector("circle, ellipse").setAttribute("fill", color);
+  }
+  return svg;
+}
+
+function colorChoices(formState, label, field) {
+  const row = el("div", { class: "choice-row", role: "group", "aria-label": label });
+  COLORS.forEach((color) => {
+    const choice = el("button", {
+      type: "button",
+      class: "color-choice",
+      "aria-label": `${label} ${color}`,
+      "aria-pressed": (formState[field] || "").toLowerCase() === color ? "true" : "false",
+    });
+    choice.style.backgroundColor = color;
+    choice.addEventListener("click", () => {
+      formState[field] = color;
+      paintMedicine();
+    });
+    row.append(choice);
+  });
+  const custom = el("input", {
+    type: "color",
+    "aria-label": label,
+    value: safeColor(formState[field]),
+  });
+  custom.addEventListener("input", () => { formState[field] = custom.value; });
+  custom.addEventListener("change", () => paintMedicine());
+  row.append(custom);
+  return el("div", { class: "stack-label", text: label }, [row]);
 }
 
 function tagGroup(selected) {
@@ -180,18 +263,18 @@ function tagGroup(selected) {
 }
 
 function medicineSelect(onPick) {
-  const select = el("select", { "aria-label": "Add a current medicine to the text" });
+  const select = el("select", { "aria-label": "Add a current box to the text" });
   select.append(el("option", {
     value: "",
-    text: state.medicines.length ? "Add a current medicine" : "No medicines",
-  }));
-  state.medicines.forEach((medicine) => {
-    select.append(el("option", { value: String(medicine.id), text: medicine.name }));
-  });
+    text: state.boxes.length ? "Add a current box" : "No boxes",
+    }));
+    state.boxes.forEach((box) => {
+      select.append(el("option", { value: String(box.id), text: box.title }));
+    });
   select.addEventListener("change", () => {
-    const medicine = state.medicines.find((item) => String(item.id) === select.value);
+    const box = state.boxes.find((item) => String(item.id) === select.value);
     select.value = "";
-    if (medicine) onPick(medicine);
+    if (box) onPick(box);
   });
   return select;
 }
@@ -244,13 +327,13 @@ function scrollLogToEnd() {
 
 async function loadLogs(token, { scroll = "end" } = {}) {
   const previous = document.getElementById("log-scroll")?.scrollTop ?? 0;
-  const [logs, medicines] = await Promise.all([
+  const [logs, boxes] = await Promise.all([
     api("/api/logs"),
-    api("/api/current-medicines"),
+    api("/api/pill-boxes"),
   ]);
   if (token != null && token !== showToken) return;
   state.logs = logs;
-  state.medicines = medicines;
+  state.boxes = boxes;
   paintLog();
   if (scroll === "end") scrollLogToEnd();
   else {
@@ -282,8 +365,8 @@ function paintLog() {
   });
   const date = el("input", { type: "date", "aria-label": "Day", value: todayDateValue(), required: "true" });
   const time = el("input", { type: "time", "aria-label": "Time", value: nowTimeValue(), required: "true" });
-  const picker = medicineSelect((medicine) => {
-    insertName(text, medicine.name);
+  const picker = medicineSelect((box) => {
+    insertName(text, box.title);
     tags.press("medication");
     text.focus();
   });
@@ -458,6 +541,7 @@ async function loadMedicine(token) {
   const [pills, boxes] = await Promise.all([
     api("/api/pills"),
     api("/api/pill-boxes"),
+    ensureShapes(),
   ]);
   if (token != null && token !== showToken) return;
   state.pills = pills;
@@ -477,12 +561,12 @@ function paintMedicine() {
   const page = el("div", { class: "page" });
   const head = el("div", { class: "page-head" }, [
     el("h1", { text: "Medicine" }),
-    el("button", { type: "button", class: "plus", "aria-label": "New pill", text: "+" }),
+    el("button", { type: "button", class: "plus", "aria-label": "New pill" }, [plusIcon()]),
   ]);
   head.querySelector("button").addEventListener("click", () => {
     state.pillForm = state.pillForm && state.pillForm.id == null
       ? null
-      : { id: null, name: "", description: "", shape: "round", color: "#f2d36b" };
+      : { id: null, name: "", description: "", shape: "big-round", color: "#f2d36b", color_right: null};
     paintMedicine();
   });
   page.append(head);
@@ -543,7 +627,7 @@ function pillFormElement() {
       class: "shape-choice",
       "aria-label": shape,
       "aria-pressed": formState.shape === shape ? "true" : "false",
-    }, [pillNode({ shape, color: formState.color })]);
+    }, [pillNode({ shape, color: formState.color, color_right: formState.color_right })]);
     choice.addEventListener("click", () => {
       formState.shape = shape;
       paintMedicine();
@@ -552,33 +636,12 @@ function pillFormElement() {
     shapeRow.append(choice);
   });
 
-  const colorRow = el("div", { class: "choice-row", role: "group", "aria-label": "Color" });
-  COLORS.forEach((color) => {
-    const choice = el("button", {
-      type: "button",
-      class: "color-choice",
-      "aria-label": color,
-      "aria-pressed": formState.color.toLowerCase() === color ? "true" : "false",
-    });
-    choice.style.backgroundColor = color;
-    choice.addEventListener("click", () => {
-      formState.color = color;
-      paintMedicine();
-    });
-    colorRow.append(choice);
-  });
-  const custom = el("input", { type: "color", "aria-label": "Custom color", value: safeColor(formState.color) });
-  custom.addEventListener("input", () => { formState.color = custom.value; });
-  custom.addEventListener("change", () => paintMedicine());
-  colorRow.append(custom);
-
-  const preview = pillNode({ shape: formState.shape, color: formState.color }, "pill");
   form.append(
     el("label", { class: "stack-label", text: "Name" }, [name]),
     el("label", { class: "stack-label", text: "What it does" }, [description]),
     el("div", { class: "stack-label", text: "Shape" }, [shapeRow]),
-    el("div", { class: "stack-label", text: "Color" }, [colorRow]),
-    el("div", { class: "choice-row" }, [el("span", { text: "Preview" }), preview]),
+    colorChoices(formState, formState.shape === "capsule" ? "Left side" : "Color", "color"),
+    formState.shape === "capsule" ? colorChoices(formState, "Right side", "color_right") : "",
     el("div", { class: "form-actions" }, [
       el("button", { type: "submit", class: "primary", text: "Save pill" }),
       el("button", { type: "button", class: "text-button", text: "Cancel" }),
@@ -595,6 +658,7 @@ function pillFormElement() {
       description: description.value,
       shape: formState.shape,
       color: formState.color,
+      color_right: formState.shape === "capsule" ? formState.color_right : null,
     };
     try {
       if (formState.id) {
@@ -625,10 +689,11 @@ function pillTray() {
 function trayCard(pill) {
   const selected = state.pickedPillId === pill.id;
   const card = el("div", { class: selected ? "tray-pill selected" : "tray-pill" });
-  const pick = el("button", {
-    type: "button",
+  const pick = el("div", {
     class: "pick",
     draggable: "true",
+    role: "button",
+    tabindex: "0",
     "aria-pressed": selected ? "true" : "false",
     "aria-label": pill.name,
   }, [
@@ -641,16 +706,40 @@ function trayCard(pill) {
     state.pickedPillId = selected ? null : pill.id;
     paintMedicine();
   });
+  pick.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      pick.click();
+    }
+  });
   pick.addEventListener("dragstart", (event) => {
     ignoreClickUntil = Date.now() + 400;
     event.dataTransfer.setData("text/plain", JSON.stringify({ kind: "library", pillId: pill.id }));
-    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.setDragImage(blankDragImage, 0, 0);
+  
+    const ghost = el("div", { class: "drag-ghost" }, [
+      pillNode(pill),
+      el("span", { class: "pill-name", text: pill.name }),
+    ]);
+    document.body.append(ghost);
+    const place = (dragEvent) => {
+      if (!dragEvent.clientX && !dragEvent.clientY) return;
+      ghost.style.left = `${dragEvent.clientX}px`;
+      ghost.style.top = `${dragEvent.clientY}px`;
+    };
+    place(event);
+    const onDrag = (dragEvent) => place(dragEvent);
+    pick.addEventListener("drag", onDrag);
+    pick.addEventListener("dragend", () => {
+      pick.removeEventListener("drag", onDrag);
+      ghost.remove();
+    }, { once: true });
   });
   const actions = el("div", { class: "tray-actions" });
   const showActions = () => {
     actions.replaceChildren(
       el("button", { type: "button", class: "text-button", text: "Edit", "aria-label": `Edit ${pill.name}` }),
-      el("button", { type: "button", class: "text-button", text: "Duplicate", "aria-label": `Duplicate ${pill.name}` }),
       el("button", { type: "button", class: "text-button danger", text: "Delete", "aria-label": `Delete ${pill.name}` }),
     );
     actions.children[0].addEventListener("click", () => {
@@ -660,11 +749,11 @@ function trayCard(pill) {
         description: pill.description,
         shape: pill.shape,
         color: pill.color,
+        color_right: pill.color_right,
       };
       paintMedicine();
     });
-    actions.children[1].addEventListener("click", () => duplicatePill(pill.id));
-    actions.children[2].addEventListener("click", () => {
+    actions.children[1].addEventListener("click", () => {
       actions.replaceChildren(
         el("span", { class: "confirm-text", text: "Remove this pill?" }),
         el("button", { type: "button", class: "text-button danger", text: "Remove" }),
@@ -677,16 +766,6 @@ function trayCard(pill) {
   showActions();
   card.append(pick, actions);
   return card;
-}
-
-async function duplicatePill(id) {
-  try {
-    await api(`/api/pills/${id}/duplicate`, { method: "POST" });
-    showError("");
-    await loadMedicine(showToken);
-  } catch (error) {
-    showError(error.message);
-  }
 }
 
 async function deletePill(id) {
@@ -869,7 +948,7 @@ function closedDay(box, weekday) {
 
 function openDay(box, weekday) {
   const grid = el("div", { class: "slot-grid" });
-  for (let slot = 0; slot < 9; slot += 1) {
+  for (let slot = 0; slot < 12; slot += 1) {
     grid.append(slotElement(box, weekday, slot));
   }
   return el("div", { class: "day open" }, [
@@ -913,10 +992,9 @@ function slotElement(box, weekday, slot) {
     });
     node.append(shape, clear, el("span", { class: "slot-name", text: pill.name }));
   }
-  node.addEventListener("dragover", (event) => {
+  document.addEventListener("dragover", (event) => {
     event.preventDefault();
-    node.classList.add("over");
-    event.dataTransfer.dropEffect = "copy";
+    event.dataTransfer.dropEffect = "move";
   });
   node.addEventListener("dragleave", (event) => {
     if (!node.contains(event.relatedTarget)) node.classList.remove("over");
@@ -986,7 +1064,7 @@ function setSlot(boxId, weekday, slot, pillId) {
 
 function addBoxControl() {
   const wrap = el("div");
-  const plus = el("button", { type: "button", class: "add-box", "aria-label": "Add pill box", text: "+" });
+  const plus = el("button", { type: "button", class: "add-box", "aria-label": "Add pill box" }, [plusIcon()]);
   plus.addEventListener("click", () => {
     state.boxForm = !state.boxForm;
     paintMedicine();

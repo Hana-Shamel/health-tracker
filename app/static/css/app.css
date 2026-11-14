@@ -10,6 +10,7 @@
   --lid: #d7dee6;
   --lid-deep: #c5ced8;
   --well: #f7f8fa;
+  --shape-choice-size: 90px;
 }
 
 *,
@@ -155,14 +156,28 @@ h1 {
   display: none;
 }
 
+.plus-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.plus,
+.add-box {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .plus {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  font-size: 22px;
-  line-height: 1;
+}
+
+.add-box {
+  width: 44px;
+  height: 44px;
+  margin-top: 8px;
 }
 
 .primary {
@@ -244,14 +259,25 @@ textarea {
   align-items: center;
 }
 
-.shape-choice,
-.color-choice {
-  width: 42px;
-  height: 42px;
+.shape-choice {
+  width: var(--shape-choice-size);
+  height: var(--shape-choice-size);
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 5px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.color-choice {
+  width: calc(var(--shape-choice-size) * 0.7);
+  height: calc(var(--shape-choice-size) * 0.7);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 5px solid var(--line);
+  border-color: var(--line);
   border-radius: 10px;
   background: var(--paper);
 }
@@ -275,40 +301,36 @@ input[type="color"] {
   background: transparent;
 }
 
-.pill {
+.pill-svg {
   display: block;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
-    inset 0 7px 8px rgba(255, 255, 255, 0.45);
+  overflow: visible;
 }
 
-.pill.round {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-}
+.pill-svg.big-round { width: 70px; height: 70px; }
+.pill-svg.small-round { width: 40px; height: 40px; }
+.pill-svg.oval { width: 80px; height: 80px; }
+.pill-svg.capsule,
+.pill-svg.injection { width: 100px; height: 100px; }
 
-.pill.oval {
-  width: 34px;
-  height: 22px;
-  border-radius: 50%;
-}
+.shape-choice .pill-svg.big-round { width: calc(var(--shape-choice-size) * 0.65); height: calc(var(--shape-choice-size) * 0.65); }
+.shape-choice .pill-svg.small-round { width: calc(var(--shape-choice-size) * 0.45); height: calc(var(--shape-choice-size) * 0.45); }
+.shape-choice .pill-svg.oval { width: calc(var(--shape-choice-size) * 0.65); height: calc(var(--shape-choice-size) * 0.65); }
+.shape-choice .pill-svg.capsule,
+.shape-choice .pill-svg.injection { width: calc(var(--shape-choice-size) * 0.7); height: calc(var(--shape-choice-size) * 0.7); }
 
-.pill.capsule {
-  width: 38px;
-  height: 18px;
-  border-radius: 999px;
-  position: relative;
-}
-
-.pill.capsule::after {
-  content: "";
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  left: 50%;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.22);
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  opacity: 1;
+  pointer-events: none;
 }
 
 .tray {
@@ -336,6 +358,8 @@ input[type="color"] {
 .pick {
   display: grid;
   justify-items: center;
+  align-items: start;
+  grid-template-rows: 100px auto auto;
   gap: 4px;
   width: 100%;
   border: 0;
@@ -346,6 +370,10 @@ input[type="color"] {
 
 .pick:active {
   cursor: grabbing;
+}
+
+.pick .pill-svg {
+  align-self: center;
 }
 
 .pill-name {
@@ -510,27 +538,19 @@ input.box-title {
   background: rgba(47, 111, 86, 0.08);
 }
 
-.slot .pill {
+.slot .pill-svg {
   position: absolute;
   top: 34px;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.slot .pill.round {
-  width: 36px;
-  height: 36px;
-}
+.slot .pill-svg.big-round { width: calc(var(--shape-choice-size) * 0.65); height: calc(var(--shape-choice-size) * 0.65); }
+.slot .pill-svg.small-round { width: calc(var(--shape-choice-size) * 0.45); height: calc(var(--shape-choice-size) * 0.45); }
+.slot .pill-svg.oval { width: calc(var(--shape-choice-size) * 0.65); height: calc(var(--shape-choice-size) * 0.65); }
+.slot .pill-svg.capsule,
+.slot .pill-svg.injection { width: calc(var(--shape-choice-size) * 0.7); height: calc(var(--shape-choice-size) * 0.7); }
 
-.slot .pill.oval {
-  width: 42px;
-  height: 28px;
-}
-
-.slot .pill.capsule {
-  width: 46px;
-  height: 22px;
-}
 
 .slot-name {
   max-width: 100%;
@@ -551,17 +571,6 @@ input.box-title {
   color: var(--muted);
   line-height: 1;
   box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.add-box {
-  width: 44px;
-  height: 44px;
-  margin-top: 8px;
-  border-radius: 50%;
-  border: 1px dashed #b7b1a4;
-  background: transparent;
-  font-size: 24px;
-  line-height: 1;
 }
 
 .log-layout {

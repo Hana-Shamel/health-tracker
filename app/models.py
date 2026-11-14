@@ -25,6 +25,7 @@ class Pill(Base):
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     shape: Mapped[str] = mapped_column(String(20))
     color: Mapped[str] = mapped_column(String(7))
+    color_right: Mapped[str | None] = mapped_column(String(7), nullable=True)
 
     placements: Mapped[list[Placement]] = relationship(
         back_populates="pill",
@@ -52,7 +53,7 @@ class Placement(Base):
     __table_args__ = (
         UniqueConstraint("pill_box_id", "weekday", "slot", name="uq_placement_slot"),
         CheckConstraint("weekday >= 0 AND weekday <= 6", name="ck_weekday"),
-        CheckConstraint("slot >= 0 AND slot <= 8", name="ck_slot"),
+        CheckConstraint("slot >= 0 AND slot <= 11", name="ck_slot"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

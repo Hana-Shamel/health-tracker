@@ -3,8 +3,9 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+
 ALLOWED_TAGS = ("food", "medication", "measurement", "physical activity", "symptom")
-ALLOWED_SHAPES = ("round", "oval", "capsule")
+ALLOWED_SHAPES = ("big-round", "small-round", "oval", "capsule", "injection")
 COLOR_RE = re.compile(r"^#[0-9a-f]{6}$")
 
 
@@ -60,6 +61,7 @@ class PillWrite(BaseModel):
     description: str = ""
     shape: str
     color: str
+    color_right: str | None = None
 
     @field_validator("name")
     @classmethod
@@ -78,9 +80,11 @@ class PillWrite(BaseModel):
             raise ValueError("Choose a shape")
         return value
 
-    @field_validator("color")
+    @field_validator("color", "color_right")
     @classmethod
-    def clean_color(cls, value: str) -> str:
+    def clean_color(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         value = value.strip().lower()
         if not COLOR_RE.fullmatch(value):
             raise ValueError("Choose a color")
@@ -124,7 +128,7 @@ class PillBoxUpdate(BaseModel):
 
 class SlotWrite(BaseModel):
     weekday: int = Field(ge=0, le=6)
-    slot: int = Field(ge=0, le=8)
+    slot: int = Field(ge=0, le=11)
     pill_id: int | None = None
 
 

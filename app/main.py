@@ -40,6 +40,7 @@ def pill_out(row: Pill) -> dict:
         "description": row.description,
         "shape": row.shape,
         "color": row.color,
+        "color_right": row.color_right if row.color_right else None,
     }
 
 
@@ -157,6 +158,7 @@ def create_pill(payload: PillWrite, db: Session = Depends(get_db)):
         description=payload.description,
         shape=payload.shape,
         color=payload.color,
+        color_right=payload.color_right if payload.color_right else None,
     )
     db.add(row)
     db.commit()
@@ -171,6 +173,7 @@ def update_pill(pill_id: int, payload: PillWrite, db: Session = Depends(get_db))
     row.description = payload.description
     row.shape = payload.shape
     row.color = payload.color
+    row.color_right = payload.color_right if payload.color_right else None
     db.commit()
     db.refresh(row)
     return pill_out(row)
@@ -184,6 +187,7 @@ def duplicate_pill(pill_id: int, db: Session = Depends(get_db)):
         description=source.description,
         shape=source.shape,
         color=source.color,
+        color_right=source.color_right if source.color_right else None,
     )
     db.add(row)
     db.commit()
