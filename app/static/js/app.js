@@ -63,7 +63,7 @@ function el(tag, attrs = {}, children = []) {
 }
 
 function plusIcon() {
-  return el("img", { class: "plus-icon", src: "/static/svg/buttons/plus.svg", alt: "" });
+  return el("span", { class: "plus-icon", "aria-hidden": "true", text: "+" });
 }
 
 function showError(message) {
@@ -569,7 +569,10 @@ function paintMedicine() {
   const page = el("div", { class: "page" });
   const head = el("div", { class: "page-head" }, [
     el("h1", { text: "Medicine" }),
-    el("button", { type: "button", class: "plus", "aria-label": "New pill" }, [plusIcon()]),
+    el("button", { type: "button", class: "medicine-add", "aria-label": "New pill" }, [
+      plusIcon(),
+      el("span", { text: "New pill" }),
+    ]),
   ]);
   head.querySelector("button").addEventListener("click", () => {
     state.pillForm = state.pillForm && state.pillForm.id == null
@@ -1066,7 +1069,10 @@ function setSlot(boxId, weekday, slot, pillId) {
 
 function addBoxControl() {
   const wrap = el("div");
-  const plus = el("button", { type: "button", class: "add-box", "aria-label": "Add pill box" }, [plusIcon()]);
+  const plus = el("button", { type: "button", class: "add-box", "aria-label": "Add pill box" }, [
+    plusIcon(),
+    el("span", { text: "Add pill box" }),
+  ]);
   plus.addEventListener("click", () => {
     state.boxForm = !state.boxForm;
     paintMedicine();

@@ -75,11 +75,13 @@ h1 { margin: 0; font-size: clamp(27px, 3vw, 34px); font-weight: 620; letter-spac
 .empty { margin: 0; font-size: 14px; }
 .notice { min-height: 1.2em; margin: 8px 0; color: var(--danger); font-size: 13px; }
 .notice:empty { display: none; }
-.plus-icon { display: block; width: 100%; height: 100%; }
-.plus, .add-box { padding: 0; border: 0; background: transparent; }
-.plus { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; transition: background .18s, transform .18s; }
-.plus:hover, .add-box:hover { background: var(--accent-soft); transform: translateY(-1px); }
-.add-box { width: 44px; height: 44px; margin-top: 10px; border-radius: 12px; }
+  .plus-icon { display: grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; font-size: 21px; font-weight: 400; line-height: 1; }
+  .medicine-add { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 0; border-radius: 11px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 620; box-shadow: 0 3px 8px rgba(45, 100, 80, .14); transition: background .18s, transform .18s, box-shadow .18s; }
+  .medicine-add:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 6px 13px rgba(45, 100, 80, .19); }
+  .medicine-add:active, .add-box:active { transform: translateY(0); }
+  .add-box { min-height: 44px; display: inline-flex; align-items: center; gap: 9px; margin-top: 10px; padding: 0 15px; border: 1px dashed #b9cdc1; border-radius: 11px; background: rgba(255,255,255,.62); color: var(--accent-dark); font-size: 13px; font-weight: 600; transition: border-color .18s, background .18s, transform .18s; }
+  .add-box:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+  .medicine-add:focus-visible, .add-box:focus-visible { outline: 3px solid rgba(57,117,99,.25); outline-offset: 3px; }
 .primary { min-height: 40px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; padding: 9px 17px; font-size: 13px; font-weight: 620; box-shadow: 0 3px 8px rgba(45, 100, 80, .14); transition: background .18s, transform .18s, box-shadow .18s; }
 .primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 6px 13px rgba(45, 100, 80, .19); }
 .primary:active { transform: translateY(0); }
