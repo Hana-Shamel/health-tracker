@@ -194,7 +194,7 @@ function svgEl(tag, attrs = {}, children = []) {
 
 
 
-function pillNode(pill) {
+function pillNode(pill, recolor = true) {
   const shape = pill.shape || "big-round";
   const color = safeColor(pill.color);
   const right = safeColor(pill.color_right || color);
@@ -204,6 +204,7 @@ function pillNode(pill) {
   svg.removeAttribute("width");
   svg.removeAttribute("height");
   svg.setAttribute("aria-hidden", "true");
+  if (!recolor) return svg;
 
   if (shape === "capsule") {
     const paths = svg.querySelectorAll("path");
@@ -595,7 +596,7 @@ function paintMedicine() {
   head.querySelector("button").addEventListener("click", () => {
     state.pillForm = state.pillForm && state.pillForm.id == null
       ? null
-      : { id: null, name: "", description: "", shape: "big-round", color: "#f2d36b", color_right: null};
+      : { id: null, name: "", description: "", shape: "big-round", color: "#f7f4ee", color_right: null};
     paintMedicine();
   });
   page.append(head);
@@ -649,7 +650,7 @@ function pillFormElement() {
       class: "shape-choice",
       "aria-label": shape,
       "aria-pressed": formState.shape === shape ? "true" : "false",
-    }, [pillNode({ shape, color: formState.color, color_right: formState.color_right })]);
+    }, [pillNode({ shape }, false)]);
     choice.addEventListener("click", () => {
       formState.shape = shape;
       paintMedicine();
@@ -658,13 +659,18 @@ function pillFormElement() {
     shapeRow.append(choice);
   });
 
+  const preview = el("div", { class: "pill-preview", "aria-hidden": "true" }, [
+    pillNode({ shape: formState.shape, color: formState.color, color_right: formState.color_right }),
+  ]);
+
   form.append(
     el("label", { class: "stack-label", text: "Name" }, [name]),
     el("label", { class: "stack-label", text: "What it does" }, [description]),
+    preview,
     el("div", { class: "stack-label", text: "Shape" }, [shapeRow]),
-    colorChoices(formState, formState.shape === "capsule" ? "Left side" : formState.shape === "cream" ? "Main body" : "Color", "color"),
+    colorChoices(formState, formState.shape === "capsule" ? "Left side" : formState.shape === "cream" ? "Body" : "Color", "color"),
     formState.shape === "capsule" || formState.shape === "cream"
-      ? colorChoices(formState, formState.shape === "cream" ? "Small piece" : "Right side", "color_right")
+      ? colorChoices(formState, formState.shape === "cream" ? "Cap" : "Right side", "color_right")
       : "",
     el("div", { class: "form-actions" }, [
       el("button", { type: "submit", class: "primary", text: "Save pill" }),
@@ -697,7 +703,19 @@ function pillFormElement() {
       showError(error.message);
     }
   });
-  return form;
+  const modal = el("div", {
+    class: "modal",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": formState.id ? "Edit pill" : "New pill",
+  }, [form]);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      state.pillForm = null;
+      paintMedicine();
+    }
+  });
+  return modal;
 }
 
 function pillTray() {

@@ -8,13 +8,13 @@
     <!-- Left half -->
     <path
         d="M6 8 H12 V16 H6 A4 4 0 0 1 6 8 Z"
-        fill="#4F46E5"
+        fill="#E5E4E2"
     />
 
     <!-- Right half -->
     <path
         d="M12 8 H18 A4 4 0 0 1 18 16 H12 Z"
-        fill="#F59E0B"
+        fill="#E5E4E2"
     />
 
     <!-- Outer border -->
