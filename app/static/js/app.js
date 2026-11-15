@@ -11,6 +11,8 @@ const WEEK_DISPLAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
 const LID_OPEN_ANGLE = 105;
 const LID_PERSPECTIVE = 900;
 const COLORS = ["#f7f4ee", "#f2d36b", "#f3a6c8", "#8eb6e8", "#7dbe8a", "#f0a05a", "#e07a7a", "#b59ad6"];
+const DEFAULT_BOX_BODY = "#d5ddd8";
+const DEFAULT_BOX_LID = "#f4f7f5";
 const SHAPES = ["big-round", "small-round", "oval", "capsule", "injection", "cream"];
 const SHAPE_FILES = {
   "big-round": "/static/svg/pills/big-round.svg",
@@ -34,6 +36,7 @@ const state = {
   pickedPillId: null,
   pillForm: null,
   boxForm: false,
+  colorPanels: {},
   editingVisitId: null,
   trayPage: 0,
 };
@@ -254,6 +257,87 @@ function colorChoices(formState, label, field) {
   ]);
   row.append(picker);
   return el("div", { class: "stack-label", text: label }, [row]);
+}
+
+function paintBoxColors(week, box) {
+  if (!week) return;
+  week.style.setProperty("--box-body", safeColor(box.body_color || DEFAULT_BOX_BODY));
+  week.style.setProperty("--box-lid", safeColor(box.lid_color || DEFAULT_BOX_LID));
+}
+
+function boxColorControl(target, field, label, fallback, hooks = {}) {
+  const group = el("div", { class: "box-color", role: "group", "aria-label": label });
+  const input = el("input", {
+    type: "color",
+    "aria-label": label,
+    value: safeColor(target[field] || fallback),
+  });
+  const swatches = COLORS.map((color) => {
+    const button = el("button", {
+      type: "button",
+      class: "color-choice",
+      "aria-label": `${label} ${color}`,
+    });
+    button.style.backgroundColor = color;
+    button.addEventListener("click", () => commit(color));
+    return button;
+  });
+  const picker = el("label", { class: "color-choice color-picker" }, [
+    el("img", { src: "/static/svg/buttons/color-picker.png", alt: "" }),
+    input,
+  ]);
+  group.append(el("span", { class: "box-color-label", text: label }), ...swatches, picker);
+  mark(input.value);
+  input.addEventListener("input", () => preview(input.value));
+  input.addEventListener("change", () => commit(input.value));
+
+  function mark(color) {
+    const chosen = safeColor(color);
+    group.querySelectorAll(".color-choice[aria-label]").forEach((button) => {
+      button.setAttribute("aria-pressed", button.getAttribute("aria-label").endsWith(chosen) ? "true" : "false");
+    });
+  }
+
+  function preview(color) {
+    target[field] = safeColor(color);
+    input.value = target[field];
+    mark(color);
+    hooks.onPreview?.();
+  }
+
+  async function commit(color) {
+    const previous = target[field];
+    preview(color);
+    if (!hooks.onCommit) return;
+    try {
+      await hooks.onCommit(target[field]);
+      showError("");
+    } catch (error) {
+      preview(previous);
+      showError(error.message);
+    }
+  }
+
+  return group;
+}
+
+function colorPanel(controls, open, onToggle) {
+  const panel = el("div", { class: "box-colors" });
+  panel.hidden = !open;
+  controls.forEach((control) => panel.append(control));
+  const toggle = el("button", {
+    type: "button",
+    class: "text-button color-toggle",
+    text: "Colors",
+    "aria-expanded": open ? "true" : "false",
+  });
+  toggle.addEventListener("click", () => {
+    const next = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", next ? "true" : "false");
+    panel.hidden = !next;
+    onToggle?.(next);
+  });
+  return el("div", { class: "color-panel" }, [toggle, panel]);
 }
 
 function tagGroup(selected) {
@@ -936,6 +1020,19 @@ function boxElement(box) {
   title.addEventListener("change", () => saveBoxField(box, title, "title", title.value, "Give the pill box a title"));
   description.addEventListener("change", () => saveBoxField(box, description, "description", description.value));
 
+  const saveColor = (field) => async (color) => {
+    const updated = await api(`/api/pill-boxes/${box.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ [field]: color }),
+    });
+    Object.assign(box, updated);
+  };
+  const previewColors = () => paintBoxColors(card.querySelector(".week"), box);
+  const colors = colorPanel([
+    boxColorControl(box, "body_color", "Box", DEFAULT_BOX_BODY, { onPreview: previewColors, onCommit: saveColor("body_color") }),
+    boxColorControl(box, "lid_color", "Lids", DEFAULT_BOX_LID, { onPreview: previewColors, onCommit: saveColor("lid_color") }),
+  ], Boolean(state.colorPanels[box.id]), (open) => { state.colorPanels[box.id] = open; });
+
   const end = el("input", { type: "date", "aria-label": "End date", value: box.end_date || "" });
   const course = el("span", { class: "course", text: courseLabel(box.end_date) });
   end.addEventListener("change", async () => {
@@ -969,7 +1066,7 @@ function boxElement(box) {
     course,
     tools,
   ]);
-  card.append(title, description, meta, weekElement(box, storedDay));
+  card.append(title, description, colors, meta, weekElement(box, storedDay));
   return card;
 }
 
@@ -1042,11 +1139,13 @@ async function copyDay(box) {
 function weekElement(box, open) {
   const body = el("div", { class: "organizer-body" });
   WEEK_DISPLAY_ORDER.forEach((weekday) => body.append(compartmentElement(box, weekday, weekday === open)));
-  return el("div", {
+  const week = el("div", {
     class: open >= 0 ? "week has-open" : "week",
     role: "group",
     "aria-label": `${box.title} weekly pill organizer`,
   }, [el("div", { class: "organizer" }, [body])]);
+  paintBoxColors(week, box);
+  return week;
 }
 
 function compartmentElement(box, weekday, isOpen) {
@@ -1325,15 +1424,20 @@ function addBoxControl() {
     placeholder: "Description",
     "aria-label": "Pill box description",
   });
+  const draft = { body_color: DEFAULT_BOX_BODY, lid_color: DEFAULT_BOX_LID };
   const form = el("form", { class: "panel" }, [
     title,
     description,
+    colorPanel([
+      boxColorControl(draft, "body_color", "Box", DEFAULT_BOX_BODY),
+      boxColorControl(draft, "lid_color", "Lids", DEFAULT_BOX_LID),
+    ], false),
     el("div", { class: "form-actions" }, [
       el("button", { type: "submit", class: "primary", text: "Add pill box" }),
       el("button", { type: "button", class: "text-button", text: "Cancel" }),
     ]),
   ]);
-  form.querySelector(".text-button").addEventListener("click", () => {
+  form.querySelector(".form-actions .text-button").addEventListener("click", () => {
     state.boxForm = false;
     paintMedicine();
   });
@@ -1346,7 +1450,12 @@ function addBoxControl() {
     try {
       await api("/api/pill-boxes", {
         method: "POST",
-        body: JSON.stringify({ title: title.value, description: description.value }),
+        body: JSON.stringify({
+          title: title.value,
+          description: description.value,
+          body_color: draft.body_color,
+          lid_color: draft.lid_color,
+        }),
       });
       state.boxForm = false;
       showError("");

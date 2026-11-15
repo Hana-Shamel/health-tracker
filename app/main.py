@@ -15,9 +15,23 @@ from app.schemas import CopyDay, LogWrite, PillBoxCreate, PillBoxUpdate, PillWri
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
+def ensure_box_color_columns() -> None:
+    with engine.begin() as connection:
+        names = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(pill_boxes)")}
+        if "body_color" not in names:
+            connection.exec_driver_sql(
+                "ALTER TABLE pill_boxes ADD COLUMN body_color VARCHAR(7) NOT NULL DEFAULT '#d5ddd8'"
+            )
+        if "lid_color" not in names:
+            connection.exec_driver_sql(
+                "ALTER TABLE pill_boxes ADD COLUMN lid_color VARCHAR(7) NOT NULL DEFAULT '#f4f7f5'"
+            )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_box_color_columns()
     yield
 
 
@@ -51,6 +65,8 @@ def box_out(row: PillBox) -> dict:
         "description": row.description,
         "end_date": row.end_date.isoformat() if row.end_date else None,
         "display_order": row.display_order,
+        "body_color": row.body_color,
+        "lid_color": row.lid_color,
         "placements": [
             {"weekday": item.weekday, "slot": item.slot, "pill_id": item.pill_id}
             for item in sorted(row.placements, key=lambda item: (item.weekday, item.slot))
@@ -214,6 +230,8 @@ def create_box(payload: PillBoxCreate, db: Session = Depends(get_db)):
     row = PillBox(
         title=payload.title,
         description=payload.description,
+        body_color=payload.body_color,
+        lid_color=payload.lid_color,
         display_order=0 if current is None else current + 1,
     )
     db.add(row)
@@ -232,6 +250,10 @@ def update_box(box_id: int, payload: PillBoxUpdate, db: Session = Depends(get_db
         row.description = changes["description"]
     if "end_date" in changes:
         row.end_date = changes["end_date"]
+    if "body_color" in changes:
+        row.body_color = changes["body_color"]
+    if "lid_color" in changes:
+        row.lid_color = changes["lid_color"]
     db.commit()
     db.refresh(row)
     return box_out(row)

@@ -41,6 +41,8 @@ class PillBox(Base):
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    body_color: Mapped[str] = mapped_column(String(7), default="#d5ddd8", server_default="#d5ddd8")
+    lid_color: Mapped[str] = mapped_column(String(7), default="#f4f7f5", server_default="#f4f7f5")
 
     placements: Mapped[list[Placement]] = relationship(
         back_populates="pill_box",

@@ -25,6 +25,15 @@ def _clean_optional(value: str, limit: int) -> str:
     return value
 
 
+def _clean_color(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip().lower()
+    if not COLOR_RE.fullmatch(value):
+        raise ValueError("Choose a color")
+    return value
+
+
 class LogWrite(BaseModel):
     occurred_at: datetime
     text: str
@@ -83,17 +92,14 @@ class PillWrite(BaseModel):
     @field_validator("color", "color_right")
     @classmethod
     def clean_color(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip().lower()
-        if not COLOR_RE.fullmatch(value):
-            raise ValueError("Choose a color")
-        return value
+        return _clean_color(value)
 
 
 class PillBoxCreate(BaseModel):
     title: str
     description: str = ""
+    body_color: str = "#d5ddd8"
+    lid_color: str = "#f4f7f5"
 
     @field_validator("title")
     @classmethod
@@ -105,11 +111,18 @@ class PillBoxCreate(BaseModel):
     def clean_description(cls, value: str) -> str:
         return _clean_optional(value, 4000)
 
+    @field_validator("body_color", "lid_color")
+    @classmethod
+    def clean_colors(cls, value: str) -> str:
+        return _clean_color(value)
+
 
 class PillBoxUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     end_date: date | None = None
+    body_color: str | None = None
+    lid_color: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -124,6 +137,11 @@ class PillBoxUpdate(BaseModel):
         if value is None:
             return None
         return _clean_optional(value, 4000)
+
+    @field_validator("body_color", "lid_color")
+    @classmethod
+    def clean_colors(cls, value: str | None) -> str | None:
+        return _clean_color(value)
 
 
 class SlotWrite(BaseModel):
