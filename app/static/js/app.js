@@ -29,8 +29,6 @@ const state = {
   boxes: [],
   visits: [],
   openDay: {},
-  animateDay: null,
-  closingDay: null,
   pickedPillId: null,
   pillForm: null,
   boxForm: false,
@@ -577,7 +575,7 @@ async function loadMedicine(token) {
   state.pills = pills;
   state.boxes = boxes;
   boxes.forEach((box) => {
-    if (state.openDay[box.id] == null) state.openDay[box.id] = todayIndex();
+    if (state.openDay[box.id] == null) state.openDay[box.id] = -1;
   });
   if (state.pickedPillId && !pills.some((pill) => pill.id === state.pickedPillId)) {
     state.pickedPillId = null;
@@ -609,7 +607,7 @@ function paintMedicine() {
   page.append(el("h2", { class: "section-label", text: "Saved pills" }));
   page.append(el("p", {
     class: "help",
-    text: "Drag a pill into a dashed circle, or select one and click a circle. One day is open at a time.",
+    text: "Open a day on the pill box, then drag a pill into a dashed circle, or select one and click a circle.",
   }));
   page.append(pillTray());
 
@@ -618,8 +616,8 @@ function paintMedicine() {
   state.boxes.forEach((box) => page.append(boxElement(box)));
   page.append(addBoxControl());
   app.replaceChildren(page);
+  page.querySelectorAll(".week").forEach((week) => layoutWeek(week, false));
   page.scrollTop = previousScroll;
-  state.animateDay = false;
 }
 
 function pillFormElement() {
@@ -909,7 +907,7 @@ async function deletePill(id) {
 }
 
 function boxElement(box) {
-  const storedDay = state.openDay[box.id] ?? todayIndex();
+  const storedDay = state.openDay[box.id] ?? -1;
   const day = storedDay >= 0 ? storedDay : todayIndex();
   const card = el("article", { class: "box-card" });
   const title = el("input", {
@@ -956,7 +954,7 @@ function boxElement(box) {
   const tools = el("div", { class: "box-tools" }, [
     el("button", {
       type: "button",
-      class: "text-button",
+      class: "text-button copy-day",
       text: `Copy ${DAYS[day]} to every day`,
     }),
     el("button", { type: "button", class: "text-button danger", text: "Remove box" }),
@@ -1040,32 +1038,150 @@ async function copyDay(box) {
 }
 
 function weekElement(box, open) {
-  const week = el("div", {
-    class: "week",
+  const body = el("div", { class: "organizer-body" });
+  WEEK_DISPLAY_ORDER.forEach((weekday) => body.append(compartmentElement(box, weekday, weekday === open)));
+  return el("div", {
+    class: open >= 0 ? "week has-open" : "week",
     role: "group",
     "aria-label": `${box.title} weekly pill organizer`,
-    "data-box-id": String(box.id),
-  });
-  const days = el("div", { class: "day-row" });
-  days.style.gridTemplateColumns = WEEK_DISPLAY_ORDER
-    .map((weekday) => weekday === open ? "minmax(var(--selected-compartment-min, 320px), 3.2fr)" : "minmax(var(--closed-compartment-min, 72px), 1fr)")
-    .join(" ");
+  }, [el("div", { class: "organizer" }, [body])]);
+}
 
-  WEEK_DISPLAY_ORDER.forEach((weekday) => {
-    const isOpen = weekday === open;
-    const isOpening = state.animateDay === box.id && isOpen;
-    const isClosing = state.closingDay?.boxId === box.id && state.closingDay.weekday === weekday;
-    const unit = el("div", {
-      class: `day-unit${isOpen ? " is-open" : ""}`,
-      "data-weekday": String(weekday),
-    });
-    unit.append(dayButton(box, weekday, isOpen, isOpening, isClosing));
-    if (isOpen) unit.append(openDay(box, weekday));
-    days.append(unit);
+function compartmentElement(box, weekday, isOpen) {
+  const pills = placementsFor(box, weekday);
+  const unit = el("div", {
+    class: `compartment-unit${isOpen ? " is-open" : ""}${weekday === todayIndex() ? " is-today" : ""}`,
+    "data-weekday": String(weekday),
   });
+  const grid = el("div", { class: "slot-grid" });
+  for (let slot = 0; slot < 12; slot += 1) {
+    grid.append(slotElement(box, weekday, slot));
+  }
+  const close = el("button", { type: "button", class: "well-close", text: "Close lid" });
+  const content = el("div", {
+    id: `pill-box-${box.id}-day-${weekday}`,
+    class: "well-content",
+    role: "region",
+    "aria-label": `${DAYS[weekday]} pill slots`,
+  }, [
+    el("div", { class: "well-head" }, [el("span", { class: "well-day", text: DAYS[weekday] }), close]),
+    grid,
+  ]);
+  content.inert = !isOpen;
 
-  week.append(el("div", { class: "organizer-scroll" }, [days]));
-  return week;
+  const lid = el("button", {
+    type: "button",
+    class: "lid",
+    "aria-controls": content.id,
+  }, [
+    el("span", { class: "lid-face" }, [
+      el("span", { class: "day-label", text: DAY_SHORT[weekday] }),
+      el("span", { class: "pips" }, pills.map((pill) => {
+        const pip = el("i", { class: "pip" });
+        pip.style.backgroundColor = safeColor(pill.color);
+        return pip;
+      })),
+    ]),
+    el("span", { class: "lid-back" }),
+  ]);
+  setLidLabel(lid, weekday, isOpen, pills.length);
+
+  const toggle = () => toggleCompartment(box, unit);
+  lid.addEventListener("click", toggle);
+  close.addEventListener("click", toggle);
+  unit.append(el("div", { class: "well" }, [content]), lid);
+  return unit;
+}
+
+function setLidLabel(lid, weekday, isOpen, count) {
+  const pills = count === 1 ? "1 pill" : `${count} pills`;
+  lid.setAttribute("aria-label", `${isOpen ? "Close" : "Open"} ${DAYS[weekday]}, ${pills}`);
+  lid.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setCompartment(unit, isOpen, lidDelay, contentDelay) {
+  const weekday = Number(unit.dataset.weekday);
+  unit.style.setProperty("--lid-delay", lidDelay);
+  unit.style.setProperty("--content-delay", contentDelay);
+  unit.classList.toggle("is-open", isOpen);
+  unit.querySelector(".well-content").inert = !isOpen;
+  const lid = unit.querySelector(".lid");
+  setLidLabel(lid, weekday, isOpen, unit.querySelectorAll(".slot.filled").length);
+}
+
+function toggleCompartment(box, unit) {
+  const week = unit.closest(".week");
+  const weekday = Number(unit.dataset.weekday);
+  const current = state.openDay[box.id] ?? -1;
+  const closing = current === weekday;
+  const previous = !closing && current >= 0
+    ? week.querySelector(`.compartment-unit[data-weekday="${current}"]`)
+    : null;
+
+  state.openDay[box.id] = closing ? -1 : weekday;
+  if (closing) {
+    week.style.setProperty("--geo-delay", ".34s");
+    setCompartment(unit, false, ".05s", "0s");
+    unit.querySelector(".lid").focus({ preventScroll: true });
+  } else if (previous) {
+    week.style.setProperty("--geo-delay", ".3s");
+    setCompartment(previous, false, ".05s", "0s");
+    setCompartment(unit, true, ".52s", ".86s");
+  } else {
+    week.style.setProperty("--geo-delay", "0s");
+    setCompartment(unit, true, ".22s", ".56s");
+  }
+  week.classList.toggle("has-open", !closing);
+  layoutWeek(week, true);
+
+  const copy = week.closest(".box-card")?.querySelector(".copy-day");
+  if (copy) copy.textContent = `Copy ${DAYS[closing ? todayIndex() : weekday]} to every day`;
+}
+
+function layoutWeek(week, animate) {
+  const organizer = week.querySelector(".organizer");
+  const body = week.querySelector(".organizer-body");
+  const units = [...body.children];
+  const view = organizer.clientWidth;
+  if (!view) return;
+
+  const pad = 14;
+  const gap = 6;
+  const room = view - pad * 2 - gap * (units.length - 1);
+  const openIndex = units.findIndex((unit) => unit.classList.contains("is-open"));
+  let widths;
+  let height;
+  let columns = 4;
+  if (openIndex < 0) {
+    widths = units.map(() => Math.min(136, room / units.length));
+    height = 190;
+  } else {
+    const openWidth = Math.min(560, Math.max(240, room * 0.5));
+    const restWidth = Math.min(80, Math.max(40, (room - openWidth) / (units.length - 1)));
+    widths = units.map((_, index) => (index === openIndex ? openWidth : restWidth));
+    columns = openWidth >= 430 ? 4 : 3;
+    height = Math.ceil(12 / columns) * 100 + 96;
+  }
+
+  const total = widths.reduce((sum, width) => sum + width, 0) + gap * (units.length - 1) + pad * 2;
+  const focus = openIndex < 0
+    ? total / 2
+    : pad + widths.slice(0, openIndex).reduce((sum, width) => sum + width, 0) + gap * openIndex + widths[openIndex] / 2;
+  const low = Math.min(0, view - total);
+  const high = Math.max(0, view - total);
+  const offset = Math.min(high, Math.max(low, view / 2 - focus));
+  const headroom = openIndex < 0 ? 16 : Math.round((height - pad * 2) * 0.14) + 12;
+
+  if (!animate) week.classList.add("no-anim");
+  week.style.setProperty("--slot-cols", String(columns));
+  organizer.style.paddingTop = `${headroom}px`;
+  body.style.height = `${height}px`;
+  body.style.transform = `translateX(${offset}px)`;
+  units.forEach((unit, index) => { unit.style.width = `${widths[index]}px`; });
+  if (!animate) {
+    void body.offsetWidth;
+    week.classList.remove("no-anim");
+  }
 }
 
 function placementsFor(box, weekday) {
@@ -1074,132 +1190,6 @@ function placementsFor(box, weekday) {
     .sort((a, b) => a.slot - b.slot)
     .map((item) => state.pills.find((pill) => pill.id === item.pill_id))
     .filter(Boolean);
-}
-
-function dayButton(box, weekday, isOpen, isOpening, isClosing) {
-  const button = el("button", {
-    type: "button",
-    class: `day${isOpen ? " open" : ""}${isOpening ? " is-opening" : ""}${isClosing ? " is-closing" : ""}`,
-    "aria-label": isOpen ? `Close ${DAYS[weekday]} compartment` : `Open ${DAYS[weekday]}`,
-    "aria-expanded": isOpen ? "true" : "false",
-    "aria-controls": isOpen ? `pill-box-${box.id}-day-${weekday}` : null,
-    "aria-pressed": isOpen ? "true" : "false",
-    "data-weekday": String(weekday),
-  }, [el("span", { class: "day-lid" }, [
-    el("span", { class: "day-label", text: DAY_SHORT[weekday] }),
-    el("span", { class: "pips" }, placementsFor(box, weekday).map((pill) => {
-      const pip = el("i", { class: "pip" });
-      pip.style.backgroundColor = safeColor(pill.color);
-      return pip;
-    })),
-  ])]);
-  button.addEventListener("click", () => {
-    const currentDay = state.openDay[box.id] ?? todayIndex();
-    const week = button.closest(".week");
-    const days = week?.querySelector(".day-row");
-    if (!week || !days) return;
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (currentDay === weekday) {
-      const unit = button.closest(".day-unit");
-      const interior = unit?.querySelector(".day-interior");
-      if (!unit || !interior) return;
-
-      state.openDay[box.id] = -1;
-      state.closingDay = { boxId: box.id, weekday };
-      state.animateDay = null;
-      button.classList.remove("open", "is-opening");
-      button.classList.add("is-closing");
-      button.setAttribute("aria-label", `Open ${DAYS[weekday]}`);
-      button.setAttribute("aria-expanded", "false");
-      button.setAttribute("aria-pressed", "false");
-      button.removeAttribute("aria-controls");
-      interior.classList.add("is-closing");
-      interior.setAttribute("aria-hidden", "true");
-      interior.inert = true;
-      days.style.gridTemplateColumns = WEEK_DISPLAY_ORDER
-        .map(() => "minmax(var(--closed-compartment-min, 72px), 1fr)")
-        .join(" ");
-      week.querySelector(".organizer-scroll")?.scrollTo({
-        left: 0,
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-      });
-      window.setTimeout(() => {
-        const reopened = state.openDay[box.id] === weekday;
-        if (state.closingDay?.boxId === box.id && state.closingDay.weekday === weekday && !reopened) state.closingDay = null;
-        if (!reopened) unit.classList.remove("is-open");
-        interior.remove();
-        button.classList.remove("is-closing");
-      }, 440);
-      return;
-    }
-
-    const previousDay = currentDay >= 0 ? currentDay : null;
-    const previousUnit = previousDay == null ? null : week.querySelector(`.day-unit[data-weekday="${previousDay}"]`);
-    const activeUnit = week.querySelector(`.day-unit[data-weekday="${weekday}"]`);
-    const closingLid = previousUnit?.querySelector(".day");
-    const closingInterior = previousUnit?.querySelector(".day-interior");
-    if (!activeUnit || (previousDay != null && (!previousUnit || !closingLid))) return;
-
-    state.closingDay = previousDay == null ? null : { boxId: box.id, weekday: previousDay };
-    state.openDay[box.id] = weekday;
-    state.animateDay = box.id;
-
-    if (previousUnit && closingLid) {
-      closingLid.classList.remove("open");
-      closingLid.classList.add("is-closing");
-      closingLid.setAttribute("aria-label", `Open ${DAYS[previousDay]}`);
-      closingLid.setAttribute("aria-expanded", "false");
-      closingLid.setAttribute("aria-pressed", "false");
-      closingLid.removeAttribute("aria-controls");
-      previousUnit.classList.remove("is-open");
-      closingInterior?.classList.add("is-closing");
-      closingInterior?.setAttribute("aria-hidden", "true");
-      if (closingInterior) closingInterior.inert = true;
-    }
-
-    activeUnit.querySelector(".day-interior.is-closing")?.remove();
-    button.classList.remove("is-closing");
-    button.classList.add("open", "is-opening");
-    button.setAttribute("aria-label", `Close ${DAYS[weekday]} compartment`);
-    button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-pressed", "true");
-    button.setAttribute("aria-controls", `pill-box-${box.id}-day-${weekday}`);
-    activeUnit.classList.add("is-open");
-    const interior = openDay(box, weekday);
-    activeUnit.append(interior);
-    days.style.gridTemplateColumns = WEEK_DISPLAY_ORDER
-      .map((day) => day === weekday ? "minmax(var(--selected-compartment-min, 320px), 3.2fr)" : "minmax(var(--closed-compartment-min, 72px), 1fr)")
-      .join(" ");
-
-    requestAnimationFrame(() => activeUnit.scrollIntoView({
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-      block: "nearest",
-      inline: "center",
-    }));
-    window.setTimeout(() => {
-      if (state.openDay[box.id] === weekday) state.animateDay = null;
-      if (state.closingDay?.boxId === box.id && state.closingDay.weekday === previousDay) state.closingDay = null;
-      button.classList.remove("is-opening");
-      closingLid?.classList.remove("is-closing");
-      closingInterior?.remove();
-      interior.classList.remove("is-opening");
-    }, 520);
-  });
-  return button;
-}
-
-function openDay(box, weekday) {
-  const grid = el("div", { class: "slot-grid" });
-  for (let slot = 0; slot < 12; slot += 1) {
-    grid.append(slotElement(box, weekday, slot));
-  }
-  return el("div", {
-    id: `pill-box-${box.id}-day-${weekday}`,
-    class: `day-interior${state.animateDay === box.id ? " is-opening" : ""}`,
-    role: "region",
-    "aria-label": `${DAYS[weekday]} pill slots`,
-  }, [el("div", { class: "compartment" }, [grid])]);
 }
 
 function slotElement(box, weekday, slot) {
@@ -1241,9 +1231,10 @@ function slotElement(box, weekday, slot) {
     });
     node.append(shape, clear, el("span", { class: "slot-name", text: pill.name }));
   }
-  document.addEventListener("dragover", (event) => {
+  node.addEventListener("dragover", (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+    node.classList.add("over");
   });
   node.addEventListener("dragleave", (event) => {
     if (!node.contains(event.relatedTarget)) node.classList.remove("over");
@@ -1553,6 +1544,9 @@ function init() {
     location.hash = button.dataset.view;
   });
   window.addEventListener("hashchange", () => show(viewFromHash()));
+  window.addEventListener("resize", () => {
+    document.querySelectorAll(".week").forEach((week) => layoutWeek(week, false));
+  });
   document.addEventListener("dragend", () => {
     document.body.classList.remove("is-dragging");
     document.querySelectorAll(".slot.over").forEach((node) => node.classList.remove("over"));
