@@ -222,12 +222,12 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
 .box-card { overflow-x: clip; }
 .week { --ease: cubic-bezier(.22, .8, .22, 1); max-width: 1120px; }
 .week.no-anim, .week.no-anim * { transition: none !important; }
-.organizer { padding: 16px 0 12px; transition: padding-top .5s var(--ease) var(--geo-delay, 0s); }
+.organizer { position: relative; height: 260px; overflow: hidden; transition: height .6s var(--ease) var(--geo-delay, 0s); }
 .organizer-body {
+  position: relative;
   display: flex;
   gap: 6px;
   width: max-content;
-  height: 190px;
   padding: 14px;
   border: 1px solid #ccd4cf;
   border-radius: 24px;
@@ -237,17 +237,20 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
     inset 0 -3px 0 rgba(30, 45, 38, .05),
     0 2px 3px rgba(30, 45, 38, .08),
     0 22px 34px -16px rgba(30, 45, 38, .32);
-  transition: transform .5s var(--ease) var(--geo-delay, 0s), height .5s var(--ease) var(--geo-delay, 0s);
+  transform-origin: 0 0;
+  transition: transform .6s var(--ease) var(--geo-delay, 0s);
 }
 .compartment-unit {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
+  width: 160px;
+  height: 220px;
   perspective: 2400px;
   perspective-origin: 50% 0;
-  transition: width .5s var(--ease) var(--geo-delay, 0s), z-index 0s linear .75s;
+  transition: z-index 0s linear .75s;
 }
-.compartment-unit.is-open { z-index: 3; transition: width .5s var(--ease) var(--geo-delay, 0s), z-index 0s; }
+.compartment-unit.is-open { z-index: 3; transition: z-index 0s; }
 .compartment-unit::before {
   position: absolute;
   top: -9px;
@@ -270,9 +273,9 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
 .well-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
   height: 100%;
-  padding: 12px 14px 14px;
+  padding: 7px 6px 6px;
   opacity: 0;
   visibility: hidden;
   transform: translateY(6px);
@@ -290,9 +293,9 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
     transform .32s var(--ease) var(--content-delay, 0s),
     visibility 0s linear var(--content-delay, 0s);
 }
-.well-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.well-day { color: var(--accent-dark); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
-.well-close { border: 0; border-radius: 7px; background: rgba(255, 255, 255, .7); padding: 4px 9px; color: var(--muted); font-size: 11px; font-weight: 600; box-shadow: 0 0 0 1px rgba(30, 45, 38, .08); transition: background .18s, color .18s; }
+.well-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; line-height: 1; }
+.well-day { color: var(--accent-dark); font-size: 6.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.well-close { border: 0; border-radius: 4px; background: rgba(255, 255, 255, .75); padding: 2px 5px; color: var(--muted); font-size: 6px; font-weight: 600; line-height: 1.2; box-shadow: 0 0 0 .5px rgba(30, 45, 38, .12); transition: background .18s, color .18s; }
 .well-close:hover { background: #fff; color: var(--ink); }
 .lid {
   position: absolute;
@@ -346,18 +349,18 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
 .compartment-unit.is-today .day-label { color: var(--accent); }
 .compartment-unit.is-today .day-label::after { display: block; width: 4px; height: 4px; margin: 6px auto 0; border-radius: 50%; background: var(--accent); content: ""; }
 .day-label { font-size: 11px; font-weight: 750; letter-spacing: .12em; line-height: 1; text-transform: uppercase; }
-.pips { display: flex; min-height: 10px; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 64px; }
+.pips { display: flex; min-height: 10px; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 100px; }
 .pip { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
-.slot-grid { display: grid; grid-template-columns: repeat(var(--slot-cols, 4), minmax(0, 1fr)); gap: 4px 6px; }
-.slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 96px; padding: 0; border-radius: 12px; }
-.slot::before { content: ""; width: 68px; height: 68px; box-sizing: border-box; border: 1.5px dashed #c2cec5; border-radius: 50%; }
+.slot-grid { display: grid; flex: 1; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 2px; }
+.slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; padding: 0; border-radius: 6px; }
+.slot::before { content: ""; width: 34px; height: 34px; box-sizing: border-box; border: 1px dashed #bfcbc3; border-radius: 50%; }
 .slot.over::before { border-color: var(--accent); background: rgba(57,117,99,.08); }
-.slot .pill-svg { position: absolute; top: 34px; left: 50%; transform: translate(-50%,-50%); }
-.slot .pill-svg.big-round, .slot .pill-svg.oval { width: calc(var(--shape-choice-size) * .65); height: calc(var(--shape-choice-size) * .65); }
-.slot .pill-svg.small-round { width: calc(var(--shape-choice-size) * .45); height: calc(var(--shape-choice-size) * .45); }
-.slot .pill-svg.capsule, .slot .pill-svg.injection { width: calc(var(--shape-choice-size) * .7); height: calc(var(--shape-choice-size) * .7); }
-.slot-name { max-width: 100%; overflow: hidden; font-size: 10px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.slot .clear { position: absolute; top: 0; left: calc(50% + 18px); width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--muted); line-height: 1; box-shadow: var(--shadow-soft); }
+.slot .pill-svg { position: absolute; top: calc(50% - 4px); left: 50%; transform: translate(-50%,-50%); }
+.slot .pill-svg.big-round, .slot .pill-svg.oval { width: 25px; height: 25px; }
+.slot .pill-svg.small-round { width: 17px; height: 17px; }
+.slot .pill-svg.capsule, .slot .pill-svg.injection, .slot .pill-svg.cream { width: 29px; height: 29px; }
+.slot-name { max-width: 100%; overflow: hidden; font-size: 6px; line-height: 1.25; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.slot .clear { position: absolute; top: 1px; left: calc(50% + 10px); display: grid; place-items: center; width: 10px; height: 10px; padding: 0; border: .5px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--muted); font-size: 8px; line-height: 1; box-shadow: 0 1px 2px rgba(30, 45, 38, .12); }
 .log-layout { display: flex; flex-direction: column; }
 .log-scroll { flex: 1; min-height: 0; overflow: auto; padding: 32px clamp(20px, 8vw, 120px) 22px; }
 .log-scroll.is-empty { display: flex; align-items: center; justify-content: center; }

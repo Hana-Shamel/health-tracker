@@ -1120,16 +1120,16 @@ function toggleCompartment(box, unit) {
 
   state.openDay[box.id] = closing ? -1 : weekday;
   if (closing) {
-    week.style.setProperty("--geo-delay", ".34s");
+    week.style.setProperty("--geo-delay", ".4s");
     setCompartment(unit, false, ".05s", "0s");
     unit.querySelector(".lid").focus({ preventScroll: true });
   } else if (previous) {
-    week.style.setProperty("--geo-delay", ".3s");
+    week.style.setProperty("--geo-delay", ".35s");
     setCompartment(previous, false, ".05s", "0s");
-    setCompartment(unit, true, ".52s", ".86s");
+    setCompartment(unit, true, ".8s", "1.12s");
   } else {
     week.style.setProperty("--geo-delay", "0s");
-    setCompartment(unit, true, ".22s", ".56s");
+    setCompartment(unit, true, ".42s", ".76s");
   }
   week.classList.toggle("has-open", !closing);
   layoutWeek(week, true);
@@ -1141,43 +1141,35 @@ function toggleCompartment(box, unit) {
 function layoutWeek(week, animate) {
   const organizer = week.querySelector(".organizer");
   const body = week.querySelector(".organizer-body");
-  const units = [...body.children];
   const view = organizer.clientWidth;
   if (!view) return;
 
-  const pad = 14;
-  const gap = 6;
-  const room = view - pad * 2 - gap * (units.length - 1);
-  const openIndex = units.findIndex((unit) => unit.classList.contains("is-open"));
-  let widths;
+  const open = body.querySelector(".compartment-unit.is-open");
+  const bodyWidth = body.offsetWidth;
+  const bodyHeight = body.offsetHeight;
+  let scale;
+  let x;
+  let y;
   let height;
-  let columns = 4;
-  if (openIndex < 0) {
-    widths = units.map(() => Math.min(136, room / units.length));
-    height = 190;
+  if (!open) {
+    scale = Math.min(1, view / bodyWidth);
+    x = (view - bodyWidth * scale) / 2;
+    y = 16;
+    height = y + bodyHeight * scale + 20;
   } else {
-    const openWidth = Math.min(560, Math.max(240, room * 0.5));
-    const restWidth = Math.min(80, Math.max(40, (room - openWidth) / (units.length - 1)));
-    widths = units.map((_, index) => (index === openIndex ? openWidth : restWidth));
-    columns = openWidth >= 430 ? 4 : 3;
-    height = Math.ceil(12 / columns) * 100 + 96;
+    const unitWidth = open.offsetWidth;
+    const unitHeight = open.offsetHeight;
+    const target = view < 700 ? view * 0.8 : Math.min(view * 0.42, 340);
+    scale = Math.min(target / unitWidth, 470 / unitHeight);
+    const headroom = Math.round(unitHeight * scale * 0.15) + 12;
+    x = view / 2 - (open.offsetLeft + unitWidth / 2) * scale;
+    y = headroom - open.offsetTop * scale;
+    height = headroom + (unitHeight + open.offsetTop) * scale + 20;
   }
 
-  const total = widths.reduce((sum, width) => sum + width, 0) + gap * (units.length - 1) + pad * 2;
-  const focus = openIndex < 0
-    ? total / 2
-    : pad + widths.slice(0, openIndex).reduce((sum, width) => sum + width, 0) + gap * openIndex + widths[openIndex] / 2;
-  const low = Math.min(0, view - total);
-  const high = Math.max(0, view - total);
-  const offset = Math.min(high, Math.max(low, view / 2 - focus));
-  const headroom = openIndex < 0 ? 16 : Math.round((height - pad * 2) * 0.14) + 12;
-
   if (!animate) week.classList.add("no-anim");
-  week.style.setProperty("--slot-cols", String(columns));
-  organizer.style.paddingTop = `${headroom}px`;
-  body.style.height = `${height}px`;
-  body.style.transform = `translateX(${offset}px)`;
-  units.forEach((unit, index) => { unit.style.width = `${widths[index]}px`; });
+  organizer.style.height = `${height}px`;
+  body.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
   if (!animate) {
     void body.offsetWidth;
     week.classList.remove("no-anim");
