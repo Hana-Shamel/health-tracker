@@ -246,9 +246,9 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
   flex: 0 0 auto;
   width: 160px;
   height: 220px;
-  perspective: 2400px;
+  perspective: 900px;
   perspective-origin: 50% 0;
-  transition: z-index 0s linear .75s;
+  transition: z-index 0s linear .9s;
 }
 .compartment-unit.is-open { z-index: 3; transition: z-index 0s; }
 .compartment-unit::before {
@@ -307,10 +307,32 @@ input.box-title:focus, textarea.box-description:focus { border-color: transparen
   background: none;
   transform-origin: 50% 0;
   transform-style: preserve-3d;
-  transition: transform .55s cubic-bezier(.32, .64, .22, 1) var(--lid-delay, 0s);
+  transition: transform .5s cubic-bezier(.55, 0, .3, 1) var(--lid-delay, 0s);
 }
-.compartment-unit.is-open > .lid { transform: rotateX(-100deg); }
+.compartment-unit.is-open > .lid { transform: rotateX(105deg); transition: transform .75s cubic-bezier(.2, .7, .2, 1) var(--lid-delay, 0s); }
 .lid-face, .lid-back { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; }
+.lid-face::before, .lid-back::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+  transition: opacity .5s ease var(--lid-delay, 0s);
+}
+.lid-face::before { background: linear-gradient(180deg, rgba(30, 45, 38, 0) 20%, rgba(30, 45, 38, .16) 100%); opacity: 0; }
+.compartment-unit.is-open .lid-face::before { opacity: 1; transition: opacity .35s ease var(--lid-delay, 0s); }
+.lid-back::before { background: linear-gradient(0deg, rgba(30, 45, 38, .22), rgba(30, 45, 38, .05)); opacity: 1; }
+.compartment-unit.is-open .lid-back::before { opacity: .25; transition: opacity .75s ease var(--lid-delay, 0s); }
+.well::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(30, 45, 38, .3) 0%, rgba(30, 45, 38, .12) 45%, rgba(30, 45, 38, .04) 100%);
+  pointer-events: none;
+  content: "";
+  transition: opacity .45s ease var(--lid-delay, 0s);
+}
+.compartment-unit.is-open .well::after { opacity: 0; transition: opacity .7s ease calc(var(--lid-delay, 0s) + .1s); }
 .lid-face {
   display: flex;
   flex-direction: column;
